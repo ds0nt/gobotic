@@ -32,12 +32,18 @@ func main() {
 
 	t = slack.NewTransport(*slackToken, "", log)
 	r := gobotic.NewCommandRouter()
+
+	r.AddInterceptor(frenchInterceptor)
 	r.Add(&gobotic.Command{
 		Name:    "say",
 		Help:    "repeats text",
 		Handler: sayHandler,
 	})
-	r.AddInterceptor(frenchInterceptor)
+	r.Add(&gobotic.Command{
+		Name:    "detect-language",
+		Help:    "detect's language",
+		Handler: detectLanguageHandler,
+	})
 
 	bot := gobotic.NewBot(t, r)
 	ctx := context.Background()
@@ -53,6 +59,11 @@ func sayHandler(msg types.MessageEvent) error {
 	t.Send(msg.Channel, msg.InputText)
 	return nil
 }
+func detectLanguageHandler(msg types.MessageEvent) error {
+	l := whatlanggo.DetectLang(msg.FullText)
+	t.Send(msg.Channel, whatlanggo.Langs[l])
+	return nil
+}
 
 func frenchInterceptor(msg types.MessageEvent) error {
 	l := whatlanggo.DetectLang(msg.FullText)
@@ -61,5 +72,6 @@ func frenchInterceptor(msg types.MessageEvent) error {
 	}
 	return nil
 }
+
 
 ```
