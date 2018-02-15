@@ -7,8 +7,17 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/ds0nt/gobotic/transports/types"
+	"github.com/ds0nt/gobotic/types"
+	"github.com/pkg/errors"
 )
+
+type Command struct {
+	Name    string
+	Help    string
+	Handler types.MessageHandler
+}
+
+type Interceptor func(msg types.MessageEvent) error
 
 const CommandNameHelp = "help"
 
@@ -58,7 +67,15 @@ func (c *CommandRouter) Run(msg types.MessageEvent) error {
 		}
 	}
 	cmd, input := c.match(msg.ArgsText)
-	return cmd.Handler(msg, input)
+	if cmd == nil {
+		return errors.Errorf("command '%s' unknown", msg.ArgsText)
+	}
+	msg.InputText = input
+	return cmd.Handler(msg)
+}
+
+func IsCommandNotFound(err error) bool {
+	return strings.HasPrefix(err.Error(), "command '") && strings.HasSuffix(err.Error(), "' unknown")
 }
 
 var help = `%s bot usage:
@@ -67,7 +84,7 @@ var help = `%s bot usage:
 Commands:
 %s`
 
-func (c *CommandRouter) Help(id string) string {
+func (c *CommandRouter) Help(botName string) string {
 	buf := bytes.Buffer{}
 	w := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', tabwriter.TabIndent)
 	for _, c := range c.commandMap {
@@ -75,5 +92,5 @@ func (c *CommandRouter) Help(id string) string {
 	}
 	w.Flush()
 	bytes, _ := ioutil.ReadAll(&buf)
-	return fmt.Sprintf(help, id, id, string(bytes))
+	return fmt.Sprintf(help, botName, botName, string(bytes))
 }

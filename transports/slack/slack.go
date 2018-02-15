@@ -4,13 +4,13 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ds0nt/gobotic/transports/types"
+	"github.com/ds0nt/gobotic/types"
 
 	"github.com/nlopes/slack"
 	"github.com/sirupsen/logrus"
 )
 
-type SlackTransport struct {
+type Transport struct {
 	Token     string
 	Channel   string
 	onMessage types.MessageHandler
@@ -21,15 +21,16 @@ type SlackTransport struct {
 	ident     *slack.UserDetails
 }
 
-func NewSlackTransport(slackToken string, channel string) *SlackTransport {
+func NewTransport(slackToken string, channel string, logger *logrus.Entry) *Transport {
 	c := slack.New(slackToken)
-	return &SlackTransport{
+	return &Transport{
 		client: c,
 		rtm:    c.NewRTM(),
+		logger: logger,
 	}
 }
 
-func (t *SlackTransport) Connect(ctx context.Context) error {
+func (t *Transport) Connect(ctx context.Context) error {
 	go t.rtm.ManageConnection()
 
 	go func() {
@@ -54,7 +55,10 @@ func (t *SlackTransport) Connect(ctx context.Context) error {
 						go func(e types.MessageEvent) {
 							err := t.onMessage(e)
 							if err != nil {
-								t.onError(err)
+								t.onError(types.Error{
+									Err:   err,
+									Event: &e,
+								})
 							}
 						}(t.messageToTypesMessage(event))
 					case *slack.MessageTooLongEvent:
@@ -74,9 +78,10 @@ func (t *SlackTransport) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (t *SlackTransport) messageToTypesMessage(msg *slack.MessageEvent) (_msg types.MessageEvent) {
+func (t *Transport) messageToTypesMessage(msg *slack.MessageEvent) (_msg types.MessageEvent) {
 	_msg.Event = msg
 	_msg.FullText = msg.Text
+	_msg.Channel = msg.Channel
 
 	if strings.HasPrefix(msg.Text, "<@"+t.ident.ID+"> ") {
 		_msg.IsCommand = true
@@ -86,53 +91,55 @@ func (t *SlackTransport) messageToTypesMessage(msg *slack.MessageEvent) (_msg ty
 	return
 }
 
-func (t *SlackTransport) SendMessage(ch string, msg string) {
+func (t *Transport) Send(channel string, text string) {
 	_, _, _, err := t.client.SendMessage(
-		ch,
-		slack.MsgOptionText(preWrap(msg), false),
+		channel,
+		slack.MsgOptionText(PreWrap(text), false),
 		slack.MsgOptionAsUser(true),
 	)
 	if err != nil {
-		t.logger.Errorln(ch, msg)
+		t.logger.Errorln(channel, text, err)
 	}
 }
-func (t *SlackTransport) SendError(ch string, err error) {
-	_, _, _, err = t.client.SendMessage(
-		ch,
-		slack.MsgOptionText(preWrap(err.Error()), false),
-		slack.MsgOptionAsUser(true),
-	)
-	if err != nil {
-		t.logger.Errorln(ch, err)
-		return
-	}
 
+func PreWrap(s string) string {
+	return "```\n" + s + "```"
 }
 
-func (t *SlackTransport) OnMessage(handler types.MessageHandler) {
+func (t *Transport) OnMessage(handler types.MessageHandler) {
 	t.onMessage = handler
 }
 
-func (t *SlackTransport) OnError(handler types.ErrorHandler) {
+func (t *Transport) OnError(handler types.ErrorHandler) {
 	t.onError = handler
 }
 
-func (t *SlackTransport) Close() error {
+func (t *Transport) Close() error {
 	return t.rtm.Disconnect()
 }
 
-func (t *SlackTransport) Client() *slack.Client {
+func (t *Transport) Client() *slack.Client {
 	return t.client
 }
 
-func (t *SlackTransport) RTM() *slack.RTM {
+func (t *Transport) RTM() *slack.RTM {
 	return t.rtm
 }
 
-func (t *SlackTransport) Ident() *slack.UserDetails {
+func (t *Transport) Ident() *slack.UserDetails {
 	return t.ident
 }
 
-func preWrap(s string) string {
-	return "```\n" + s + "```"
+func (t *Transport) BotID() string {
+	if t.ident == nil {
+		return ""
+	}
+	return t.ident.ID
+}
+
+func (t *Transport) BotName() string {
+	if t.ident == nil {
+		return ""
+	}
+	return t.ident.Name
 }

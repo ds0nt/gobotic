@@ -3,7 +3,7 @@ package gobotic
 import (
 	"context"
 
-	"github.com/ds0nt/gobotic/transports/types"
+	"github.com/ds0nt/gobotic/types"
 )
 
 type Bot struct {
@@ -32,12 +32,16 @@ func (c *Bot) OnMessage(msg types.MessageEvent) error {
 	if msg.IsCommand {
 		err := c.router.Run(msg)
 		if err != nil {
-			return err
+			if IsCommandNotFound(err) {
+				c.transport.Send(msg.Channel, c.router.Help(c.transport.BotName()))
+			} else {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (c *Bot) OnError(err error) {
-	c.transport.SendError(err)
+func (c *Bot) OnError(err types.Error) {
+	c.transport.Send(err.Event.Channel, err.Err.Error())
 }
