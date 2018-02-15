@@ -10,7 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type SlackTransport struct {
+// Transport provides transport access to slack.
+type Transport struct {
 	Token     string
 	Channel   string
 	onMessage types.MessageHandler
@@ -21,15 +22,17 @@ type SlackTransport struct {
 	ident     *slack.UserDetails
 }
 
-func NewSlackTransport(slackToken string, channel string) *SlackTransport {
-	c := slack.New(slackToken)
-	return &SlackTransport{
+// NewTransport returns a new instance of Transport.
+func NewTransport(token string, channel string) *Transport {
+	c := slack.New(token)
+	return &Transport{
 		client: c,
 		rtm:    c.NewRTM(),
 	}
 }
 
-func (t *SlackTransport) Connect(ctx context.Context) error {
+// Connect initializes our transport connection.
+func (t *Transport) Connect(ctx context.Context) error {
 	go t.rtm.ManageConnection()
 
 	go func() {
@@ -74,7 +77,7 @@ func (t *SlackTransport) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (t *SlackTransport) messageToTypesMessage(msg *slack.MessageEvent) (_msg types.MessageEvent) {
+func (t *Transport) messageToTypesMessage(msg *slack.MessageEvent) (_msg types.MessageEvent) {
 	_msg.Event = msg
 	_msg.FullText = msg.Text
 
@@ -86,7 +89,8 @@ func (t *SlackTransport) messageToTypesMessage(msg *slack.MessageEvent) (_msg ty
 	return
 }
 
-func (t *SlackTransport) SendMessage(ch string, msg string) {
+// SendMessage sends a message over the transport.
+func (t *Transport) SendMessage(ch string, msg string) {
 	_, _, _, err := t.client.SendMessage(
 		ch,
 		slack.MsgOptionText(preWrap(msg), false),
@@ -96,7 +100,9 @@ func (t *SlackTransport) SendMessage(ch string, msg string) {
 		t.logger.Errorln(ch, msg)
 	}
 }
-func (t *SlackTransport) SendError(ch string, err error) {
+
+// SendError sends an error over the transport.
+func (t *Transport) SendError(ch string, err error) {
 	_, _, _, err = t.client.SendMessage(
 		ch,
 		slack.MsgOptionText(preWrap(err.Error()), false),
@@ -106,30 +112,35 @@ func (t *SlackTransport) SendError(ch string, err error) {
 		t.logger.Errorln(ch, err)
 		return
 	}
-
 }
 
-func (t *SlackTransport) OnMessage(handler types.MessageHandler) {
+// OnMessage defines how to react when receiving a message over the transport.
+func (t *Transport) OnMessage(handler types.MessageHandler) {
 	t.onMessage = handler
 }
 
-func (t *SlackTransport) OnError(handler types.ErrorHandler) {
+// OnError defines how to react when receiving an error over the transport.
+func (t *Transport) OnError(handler types.ErrorHandler) {
 	t.onError = handler
 }
 
-func (t *SlackTransport) Close() error {
+// Close closes the transport.
+func (t *Transport) Close() error {
 	return t.rtm.Disconnect()
 }
 
-func (t *SlackTransport) Client() *slack.Client {
+// Client returns any underlying transport client.
+func (t *Transport) Client() *slack.Client {
 	return t.client
 }
 
-func (t *SlackTransport) RTM() *slack.RTM {
+// RTM returns the underlying RTM.
+func (t *Transport) RTM() *slack.RTM {
 	return t.rtm
 }
 
-func (t *SlackTransport) Ident() *slack.UserDetails {
+// Ident returns the transports logged in user's identification.
+func (t *Transport) Ident() *slack.UserDetails {
 	return t.ident
 }
 
