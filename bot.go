@@ -7,11 +7,11 @@ import (
 )
 
 type Bot struct {
-	transport Transport
+	transport types.Transport
 	router    *CommandRouter
 }
 
-func NewBot(t Transport, r *CommandRouter) *Bot {
+func NewBot(t types.Transport, r *CommandRouter) *Bot {
 	return &Bot{
 		transport: t,
 		router:    r,

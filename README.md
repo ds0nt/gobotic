@@ -68,7 +68,7 @@ func detectLanguageHandler(msg types.MessageEvent) error {
 func frenchInterceptor(msg types.MessageEvent) error {
 	l := whatlanggo.DetectLang(msg.FullText)
 	if l == whatlanggo.Fra {
-		return errors.Errorf("Sorry, I don't execute les commands, mon ami. .")
+		return errors.Errorf("Je ne parle pas francais.")
 	}
 	return nil
 }

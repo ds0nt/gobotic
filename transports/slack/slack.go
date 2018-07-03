@@ -23,6 +23,9 @@ type Transport struct {
 
 func NewTransport(slackToken string, channel string, logger *logrus.Entry) *Transport {
 	c := slack.New(slackToken)
+	if logger == nil {
+		logger = logrus.NewEntry(logrus.New())
+	}
 	return &Transport{
 		client: c,
 		rtm:    c.NewRTM(),
@@ -82,6 +85,8 @@ func (t *Transport) messageToTypesMessage(msg *slack.MessageEvent) (_msg types.M
 	_msg.Event = msg
 	_msg.FullText = msg.Text
 	_msg.Channel = msg.Channel
+	_msg.User = msg.User
+	_msg.Transport = t
 
 	if strings.HasPrefix(msg.Text, "<@"+t.ident.ID+"> ") {
 		_msg.IsCommand = true
